@@ -1,54 +1,49 @@
-# Infrastructure Setup & SSH Security Hardening
+# Lab 01 – Infrastructure Setup and SSH Hardening
 
-## 1. Project Overview
+## 1. Overview
 
-This project documents the initial setup of a physical Ubuntu Server homelab and the process of securing remote administration.
+In this lab, I set up an older Lenovo laptop as a dedicated Ubuntu Server machine and configured remote access from my Windows workstation.
 
-I wanted to repurpose an older laptop into a dedicated Linux server instead of leaving it unused. The goal is to build a practical environment where I can develop skills in Linux administration, networking, cybersecurity, and infrastructure management.
+The idea was to reuse hardware I already had instead of leaving it unused. I wanted to build a small homelab where I could practice Linux administration, networking, and security.
 
-The lab uses two computers:
+I use two computers:
 
-- **Main Workstation:** A newer laptop running Windows 11, used to manage the server remotely.
-- **Physical Server:** An older Lenovo laptop running Ubuntu Server.
+- **Main Workstation:** A newer laptop running Windows 11, used to manage the server.
+- **Server:** An older Lenovo laptop running Ubuntu Server.
 
-Windows was removed from the older laptop and replaced with Ubuntu Server. The machine is configured to operate as a headless server, allowing remote administration without a permanently connected monitor, keyboard, or mouse.
+The server runs without a monitor, keyboard, or mouse connected. I manage it remotely through SSH from my main computer.
 
-This first stage focuses on server setup, SSH remote access, public key authentication, and SSH security hardening.
+This first lab covers the initial server setup, network configuration, SSH access, and the steps I took to secure remote authentication.
 
-## 2. Server Hardware & Configuration
+## 2. Lab Environment
 
 | Component | Configuration |
 |---|---|
 | Operating System | Ubuntu Server 26.04.1 LTS |
 | Kernel | Linux 7.0.0-44-generic |
-| CPU | Intel Core i5, 11th Generation |
+| CPU | Intel Core i5 (11th Gen) |
 | RAM | 8 GB |
-| Storage | Samsung SSD, approximately 238 GB |
-| Network Interface | Intel Wi-Fi 6 AX201 |
+| Storage | Samsung SSD (~238 GB) |
+| Network Adapter | Intel Wi-Fi 6 AX201 |
 | Hostname | cyberducks3 |
 | Linux User | cyberduck |
-| Connection | Wi-Fi, 5 GHz |
-| Remote Administration | OpenSSH |
+| Network Connection | Wi-Fi (5 GHz) |
+| Remote Access | OpenSSH |
+| Client OS | Windows 11 |
 
-The server is configured to remain operational when the laptop lid is closed, allowing it to run as a small physical server.
+The server is configured to stay running when the laptop lid is closed, allowing it to operate as a headless machine.
 
-## 3. Network Configuration – Netplan
+## 3. Network Configuration with Netplan
 
-The first step was connecting Ubuntu Server to the local wireless network using Netplan.
+Before setting up SSH, I needed to make sure the server could connect to my local network.
 
-During configuration, I encountered an issue involving the `match` and `set-name` directives. The selected configuration was not compatible with the Wi-Fi setup using the `systemd-networkd` backend.
+Ubuntu Server uses Netplan to manage network configuration. In my case, I was setting up a wireless connection.
 
-### Troubleshooting
+During the initial setup, I ran into an issue with the `match` and `set-name` configuration. Rather than keeping a configuration that was not working, I removed those directives and adjusted the Netplan file to use the existing network interface.
 
-To resolve the issue, I:
+I then generated and applied the configuration.
 
-1. Reviewed the Netplan configuration.
-2. Removed the incompatible directives.
-3. Generated the configuration again.
-4. Applied the updated settings.
-5. Tested network connectivity.
-
-### Commands Used
+**Commands used:**
 
 ```bash
 sudo netplan generate --debug
@@ -56,113 +51,198 @@ sudo netplan apply
 ping -c 4 google.com
 ```
 
-After correcting the configuration, the server successfully connected to the wireless network and obtained its network configuration through DHCP.
+After making the changes, the server connected to the Wi-Fi network and I was able to test connectivity using `ping`.
 
-## 4. Remote Administration – OpenSSH
+This gave me a working network connection before moving on to remote administration.
 
-Once network connectivity was working, I configured OpenSSH to manage the server remotely from Windows 11.
+## 4. Setting Up Remote Access with OpenSSH
 
-This avoids having to connect a monitor, keyboard, or mouse every time I need to administer Ubuntu.
+Once networking was working, I used OpenSSH to access the Ubuntu server from Windows.
 
-### SSH Connection
+This makes it possible to manage the server through PowerShell without needing to work directly on the laptop.
 
-From Windows PowerShell:
+From Windows PowerShell, I connected using:
 
 ```powershell
 ssh cyberduck@<SERVER_PRIVATE_IP>
 ```
 
-The connection provides an encrypted remote terminal session to the Ubuntu server.
+I replaced the placeholder with the server's actual private IP address.
 
-This was the first step toward operating the laptop as a headless server.
+After establishing the connection, I could run Linux commands remotely from my Windows workstation.
 
-## 5. SSH Key Authentication – Ed25519
+## 5. SSH Key Authentication
 
-After confirming that remote access worked, I configured public key authentication.
+After confirming that SSH access worked, I moved on to public key authentication.
 
-The goal was to use an SSH key pair instead of relying exclusively on the Ubuntu account password.
+My goal was to use an SSH key pair instead of relying on password-based SSH login.
 
-### Generate the Key Pair
+### 5.1 Generating an Ed25519 Key Pair
 
-From Windows PowerShell:
+I generated the key pair from Windows PowerShell:
 
 ```powershell
 ssh-keygen -t ed25519 -C "cyberduck@home-lab"
 ```
 
-I generated an Ed25519 key pair and protected the private key with a passphrase.
+I selected a passphrase to protect the private key.
 
-Two files were created:
+The process created two files:
 
 | File | Purpose |
 |---|---|
-| `id_ed25519` | Private key, stored securely on Windows |
-| `id_ed25519.pub` | Public key, installed on Ubuntu |
+| `id_ed25519` | Private key |
+| `id_ed25519.pub` | Public key |
 
-The private key remains on the Windows workstation. Only the public key is transferred to the server.
+The private key stays on my Windows workstation. Only the public key is transferred to the Ubuntu server.
 
-### Evidence – Key Generation
+**SSH key generation:**
 
 ![SSH Key Generation](./screenshots/03-02-ssh-key-generation.png)
 
-### Evidence – Windows SSH Key Files
+**Files created on Windows:**
 
-![Windows SSH Key Files](./screenshots/03-02-ssh-key-files.png)
+![SSH Key Files](./screenshots/03-02-ssh-key-files.png)
 
-### Prepare the SSH Directory on Ubuntu
+### 5.2 Preparing the SSH Directory on Ubuntu
 
-On Ubuntu, I created the `.ssh` directory and restricted its permissions:
+On the Ubuntu server, I created the `.ssh` directory and configured its permissions.
 
 ```bash
-mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
 ```
 
-The `authorized_keys` file was configured with permissions of `600`.
-
-These permissions help prevent unauthorized local access to SSH authentication files.
-
-### Evidence – SSH Directory Permissions
-
-![SSH Directory Permissions](./screenshots/rutacarpetapermisos.png)
-
-### Install the Public Key
-
-The public key was transferred from Windows and added to:
+The public key was then added to:
 
 ```text
 ~/.ssh/authorized_keys
 ```
 
-The private key was never transferred.
+I also made sure the `authorized_keys` file had the appropriate permissions:
 
-### Verify Public Key Authentication
+```bash
+chmod 600 "$HOME/.ssh/authorized_keys"
+```
 
-I tested the connection using public key authentication:
+These permissions help protect the files used for SSH authentication.
+
+**SSH directory and permissions:**
+
+![SSH Directory Permissions](./screenshots/rutacarpetapermisos.png)
+
+### 5.3 Testing Public Key Authentication
+
+After adding the public key, I tested the connection from Windows:
 
 ```powershell
 ssh -o PreferredAuthentications=publickey cyberduck@<SERVER_PRIVATE_IP>
 ```
 
-The server accepted the key and opened a remote session after the private key's passphrase was entered.
+The connection was successful.
 
-### Evidence – Successful SSH Authentication
+At this point, the server was accepting my Ed25519 key for authentication.
 
-![Successful SSH Authentication](./screenshots/03-03-ssh-key-authentication-success.png)
+![Successful SSH Key Authentication](./screenshots/03-03-ssh-key-authentication-success.png)
 
 ## 6. SSH Security Hardening
 
-With key-based authentication working, I started tightening the SSH server configuration.
+With key-based authentication working, I moved on to securing the SSH configuration.
 
-The objectives were:
+I wanted to make sure that:
 
-- Disable password-based SSH authentication.
-- Allow public key authentication.
-- Disable keyboard-interactive authentication.
-- Prevent direct root login through SSH.
+- Password-based SSH authentication was disabled.
+- Public key authentication remained enabled.
+- Keyboard-interactive authentication was disabled.
+- Direct root login through SSH was disabled.
 
-### Custom Configuration File
+To organize these settings, I created a custom configuration file:
 
-I created a custom configuration file:
+```text
+/etc/ssh/sshd_config.d/99-hardening.conf
+```
+
+The file contained:
+
+```text
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+PermitRootLogin no
+```
+
+Each setting controls a different part of SSH authentication and access.
+
+| Setting | Purpose |
+|---|---|
+| `PasswordAuthentication no` | Disables password-based SSH login. |
+| `KbdInteractiveAuthentication no` | Disables keyboard-interactive authentication. |
+| `PubkeyAuthentication yes` | Allows authentication using SSH public keys. |
+| `PermitRootLogin no` | Prevents direct root login through SSH. |
+
+**SSH hardening configuration:**
+
+![SSH Hardening Configuration](./screenshots/Captura%20de%20pantalla%202026-11-24%20143235.png)
+
+## 7. Troubleshooting – SSH Configuration Conflict
+
+This was one of the more useful parts of the lab because my first attempt at disabling password authentication did not work as expected.
+
+### 7.1 The Problem
+
+Even though I had added:
+
+```text
+PasswordAuthentication no
+```
+
+to my custom configuration file, SSH was still accepting password authentication.
+
+Instead of assuming the setting was working, I checked the effective SSH configuration.
+
+I used:
+
+```bash
+sudo sshd -T | grep -E 'pubkeyauthentication|passwordauthentication|permitrootlogin'
+```
+
+The output was:
+
+```text
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication yes
+```
+
+The problem was clear: password authentication was still enabled.
+
+**Initial SSH configuration check:**
+
+![SSH Configuration Baseline](./screenshots/03-04-ssh-security-configuration-baseline.png)
+
+### 7.2 Finding the Cause
+
+I searched the main SSH configuration file and the additional configuration files:
+
+```bash
+sudo grep -RniE '^(Include|Match|PasswordAuthentication|KbdInteractiveAuthentication|PubkeyAuthentication|PermitRootLogin)' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/
+```
+
+This helped me find two files with different values for `PasswordAuthentication`.
+
+**First file:**
+
+```text
+/etc/ssh/sshd_config.d/50-cloud-init.conf
+```
+
+It contained:
+
+```text
+PasswordAuthentication yes
+```
+
+**Second file:**
 
 ```text
 /etc/ssh/sshd_config.d/99-hardening.conf
@@ -172,104 +252,25 @@ It contained:
 
 ```text
 PasswordAuthentication no
-KbdInteractiveAuthentication no
-PubkeyAuthentication yes
-PermitRootLogin no
 ```
 
-These settings were intended to require public key authentication and prevent direct root login.
+### 7.3 Understanding the Conflict
 
-### Evidence – Custom SSH Configuration
+The issue was related to how OpenSSH reads its configuration files.
 
-![SSH Hardening Configuration](./screenshots/Captura%20de%20pantalla%202026-11-24%20143235.png)
+Ubuntu uses the `Include` directive to load additional SSH configuration files. In this setup, the files were processed in alphabetical order.
 
-## 7. Troubleshooting – SSH Configuration Conflict
+For most SSH settings, OpenSSH uses the first value it finds.
 
-This was one of the most important parts of the setup because the first hardening attempt did not behave as expected.
+Since `50-cloud-init.conf` was processed before `99-hardening.conf`, its `PasswordAuthentication yes` setting was taking effect.
 
-### Problem
+This explained why my custom configuration was not producing the result I expected.
 
-Even after creating `99-hardening.conf` with:
-
-```text
-PasswordAuthentication no
-```
-
-SSH was still accepting password authentication.
-
-The custom configuration looked correct, but the effective SSH configuration showed something different.
-
-### Initial Investigation
-
-I checked the effective configuration:
-
-```bash
-sudo sshd -T | grep -E 'pubkeyauthentication|passwordauthentication|permitrootlogin'
-```
-
-The output showed:
-
-```text
-permitrootlogin no
-pubkeyauthentication yes
-passwordauthentication yes
-```
-
-The last value was unexpected because password authentication was supposed to be disabled.
-
-### Evidence – Effective Configuration Before the Fix
-
-![SSH Configuration Before Fix](./screenshots/03-04-ssh-security-configuration-baseline.png)
-
-### Investigating the Configuration Files
-
-Instead of assuming the custom file was being ignored, I searched the SSH configuration files:
-
-```bash
-sudo grep -RniE '^(Include|Match|PasswordAuthentication|KbdInteractiveAuthentication|PubkeyAuthentication|PermitRootLogin)' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/
-```
-
-The investigation revealed two files containing conflicting values.
-
-**File 1:**
-
-```text
-/etc/ssh/sshd_config.d/50-cloud-init.conf
-```
-
-Contained:
-
-```text
-PasswordAuthentication yes
-```
-
-**File 2:**
-
-```text
-/etc/ssh/sshd_config.d/99-hardening.conf
-```
-
-Contained:
-
-```text
-PasswordAuthentication no
-```
-
-### Root Cause
-
-The issue came from OpenSSH configuration precedence.
-
-Ubuntu includes additional SSH configuration files through the `Include` directive. OpenSSH uses the first obtained value for most configuration options.
-
-Because `50-cloud-init.conf` was processed before `99-hardening.conf`, its `PasswordAuthentication yes` setting took precedence.
-
-This explained why the effective configuration still allowed password authentication.
-
-### Evidence – Configuration Conflict
+**Configuration conflict:**
 
 ![SSH Configuration Conflict](./screenshots/03-07-ssh-config-conflict.png)
 
-### Resolution
+### 7.4 Fixing the Configuration
 
 I corrected the conflicting setting in:
 
@@ -277,7 +278,7 @@ I corrected the conflicting setting in:
 /etc/ssh/sshd_config.d/50-cloud-init.conf
 ```
 
-The value was changed from:
+I changed:
 
 ```text
 PasswordAuthentication yes
@@ -289,9 +290,11 @@ To:
 PasswordAuthentication no
 ```
 
-This removed the conflicting setting that had been enabling password authentication.
+This removed the conflicting value that was allowing password authentication.
 
-## 8. Validate and Apply the Configuration
+After making the change, I checked the effective configuration again.
+
+## 8. Validating and Applying the Changes
 
 Before reloading SSH, I checked the configuration syntax:
 
@@ -299,15 +302,15 @@ Before reloading SSH, I checked the configuration syntax:
 sudo sshd -t
 ```
 
-The command completed without displaying syntax errors.
+The command returned no errors, which meant the configuration passed the syntax check.
 
-Next, I checked the effective configuration again:
+Next, I checked the effective settings again:
 
 ```bash
 sudo sshd -T | grep -E 'pubkeyauthentication|passwordauthentication|permitrootlogin'
 ```
 
-The final output showed:
+The output was now:
 
 ```text
 permitrootlogin no
@@ -315,47 +318,41 @@ pubkeyauthentication yes
 passwordauthentication no
 ```
 
-This time, the effective configuration matched the intended security settings.
+This was the result I wanted.
 
-### Evidence – Effective Configuration After the Fix
+**Corrected SSH configuration:**
 
-![SSH Configuration After Fix](./screenshots/errorcorregido.png)
+![Corrected SSH Configuration](./screenshots/errorcorregido.png)
 
-### Reload SSH
-
-After validating the configuration, I applied the changes:
+Once the configuration was validated, I reloaded the SSH service:
 
 ```bash
 sudo systemctl reload ssh
 ```
 
-The service was reloaded without restarting the entire server.
+This applied the changes without restarting the entire server.
 
-## 9. Final SSH Authentication Tests
+## 9. Testing SSH Authentication
 
-I performed separate tests to make sure the new settings were actually working.
+After applying the changes, I performed separate tests to check that the authentication settings were working as expected.
 
-### First-Time Host Key Verification
+### 9.1 Initial Authentication Test
 
-During an initial connection to the server, SSH displayed a host authenticity prompt.
+During the initial testing, I checked how SSH handled password-based authentication.
 
-This is part of the SSH host verification process. The client needs to verify the server's host key before trusting and recording it in `known_hosts`.
+This was important because I needed to confirm whether the server was still accepting account passwords before completing the hardening process.
 
-This is different from user authentication: the host key identifies the server, while the Ed25519 user key authenticates the user.
+![Initial SSH Authentication Test](./screenshots/03-05-ssh-password-authentication-test.png)
 
-### Evidence – SSH Host Key Verification
+### 9.2 Testing Password Authentication
 
-![SSH Host Key Verification](./screenshots/03-05-ssh-password-authentication-test.png)
-
-### Test 1 – Password Authentication Rejected
-
-From Windows PowerShell, I forced SSH to use password authentication while disabling public key authentication:
+From Windows PowerShell, I forced SSH to use password authentication and disabled public key authentication for the test:
 
 ```powershell
 ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no cyberduck@<SERVER_PRIVATE_IP>
 ```
 
-The server rejected the attempt and returned:
+The server rejected the connection and returned:
 
 ```text
 Permission denied (publickey).
@@ -363,90 +360,89 @@ Permission denied (publickey).
 
 This confirmed that password-only SSH authentication was no longer accepted.
 
-### Evidence – Password Authentication Denied
-
 ![SSH Password Authentication Denied](./screenshots/03-09-ssh-password-authentication-denied..png)
 
-### Test 2 – Public Key Authentication
+### 9.3 Testing Public Key Authentication
 
-I also confirmed that a normal SSH connection still worked:
+I then tested a normal SSH connection:
 
 ```powershell
 ssh cyberduck@<SERVER_PRIVATE_IP>
 ```
 
-The connection succeeded using the Ed25519 private key and its passphrase, without asking for the Ubuntu account password.
+The connection succeeded using my Ed25519 private key.
 
-### Final Result
+The Ubuntu account password was no longer needed for SSH authentication. The private key was still protected by its passphrase.
 
-- Password authentication: disabled.
-- Public key authentication: enabled.
-- Direct root SSH login: disabled.
-- SSH configuration syntax: validated.
-- SSH service: reloaded.
-- Password-only authentication: rejected.
-- Public key authentication: successful.
+## 10. Final Results
 
-## 10. Lessons Learned
+After completing the configuration and testing, these were the results:
 
-This project provided practical experience with:
+| Check | Result |
+|---|---|
+| SSH remote access | Working |
+| Ed25519 key authentication | Working |
+| Password-based SSH authentication | Disabled |
+| Keyboard-interactive authentication | Disabled |
+| Direct root SSH login | Disabled |
+| SSH configuration syntax | Validated |
+| Effective SSH settings | Verified |
+| Password-only authentication test | Rejected |
+| Public key authentication test | Successful |
 
-1. Installing and configuring Ubuntu Server on repurposed hardware.
-2. Connecting a Linux server to Wi-Fi using Netplan.
-3. Managing a headless server remotely.
-4. Generating Ed25519 SSH key pairs.
-5. Understanding the difference between public and private keys.
-6. Configuring SSH directory and file permissions.
-7. Securing remote access with public key authentication.
-8. Investigating OpenSSH configuration precedence.
-9. Identifying conflicting configuration files.
-10. Using `sshd -T` to inspect effective settings.
-11. Using `sshd -t` to validate configuration syntax.
-12. Applying SSH changes safely with a service reload.
-13. Testing authentication methods independently.
+The server was now accessible remotely through SSH using public key authentication.
 
-The SSH configuration issue was especially useful because it showed that editing a configuration file does not automatically mean the service is using the value you expect. Checking the effective configuration was necessary to find the actual problem.
+One important distinction: disabling `PasswordAuthentication` affects SSH login. It does not remove the Linux user's password or prevent its use for local authentication and `sudo`.
 
-## 11. Skills Practiced
+## 11. What I Learned
+
+This lab helped me understand more than just how to connect to a Linux server.
+
+I got practical experience with:
+
+- Installing and setting up Ubuntu Server on an older laptop.
+- Configuring wireless networking with Netplan.
+- Managing a server remotely from Windows.
+- Generating and using Ed25519 SSH keys.
+- Understanding the difference between public and private keys.
+- Setting Linux directory and file permissions.
+- Configuring OpenSSH authentication settings.
+- Checking the effective SSH configuration with `sshd -T`.
+- Validating configuration syntax with `sshd -t`.
+- Troubleshooting conflicting configuration files.
+- Testing SSH authentication instead of assuming the settings were working.
+
+The biggest lesson for me was the SSH configuration conflict.
+
+I had already changed the setting to disable password authentication, but that did not mean SSH was actually using the value I expected.
+
+Checking the effective configuration helped me find the problem and understand why it was happening.
+
+## 12. Skills Practiced
 
 - Linux System Administration
 - Ubuntu Server
-- Network Configuration with Netplan
-- OpenSSH Configuration
-- SSH Security Hardening
-- Ed25519 Public Key Authentication
+- Netplan
+- OpenSSH
+- SSH Key Authentication
 - Linux File Permissions
+- SSH Security Hardening
 - Windows PowerShell
 - Remote Server Administration
-- Troubleshooting and Root Cause Analysis
+- Troubleshooting
 - Configuration Validation
-- Security Testing
+- Basic Security Testing
 
-## 12. Project Status
+## 13. Lab Status
 
-### Completed
+**Status: Completed**
 
-- Installed Ubuntu Server on the older Lenovo laptop.
-- Configured wireless networking with Netplan.
-- Configured the server for headless operation.
-- Established remote administration through OpenSSH.
-- Generated an Ed25519 SSH key pair on Windows.
-- Installed the public key on Ubuntu.
-- Configured SSH directory and file permissions.
-- Created custom SSH hardening settings.
-- Investigated and resolved the SSH configuration conflict.
-- Disabled SSH password authentication.
-- Disabled direct root SSH login.
-- Verified the effective SSH configuration.
-- Confirmed that password-only authentication is rejected.
-- Confirmed that public key authentication works.
+The initial Ubuntu Server setup and SSH hardening are complete. Remote access is working, public key authentication is enabled, and password-based SSH authentication has been tested and rejected.
 
-### Next Steps
-
-The homelab is an ongoing project. The next stage will cover firewall configuration and verification in a separate lab, followed by Linux user and group management, file permissions, and additional server administration exercises.
+This lab is the starting point for the rest of the homelab. Future exercises will build on this server and its existing configuration.
 
 ---
 
 **Project:** Ubuntu Server Homelab  
-**Phase 01:** Infrastructure Setup & SSH Security Hardening  
-**Status:** Completed
+**Lab:** 01 – Infrastructure Setup and SSH Hardening  
+**Environment:** Physical Lenovo Laptop + Windows 11 Workstation
